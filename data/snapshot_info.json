@@ -1,0 +1,8 @@
+{
+  "snapshot_date_utc": "20260619",
+  "n_events": 32568,
+  "n_objects": 18934,
+  "n_pha_official": 1379,
+  "python": "3.11.9",
+  "pandas": "2.3.3"
+}

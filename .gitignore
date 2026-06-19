@@ -1,6 +1,10 @@
 # Datos generados
 *.csv
 
+# Excepcion: snapshot congelado del dataset (reproducibilidad del paper)
+!data/close_approaches_v*.csv
+!snapshot_info.json
+
 # Jupyter checkpoints
 .ipynb_checkpoints/
 
@@ -20,3 +24,7 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# AI
+Claude.md
+.claude/
