@@ -1,29 +1,35 @@
-# Tested environment: Python 3.11.9 (Windows). Pinned for reproducibility of the paper.
+# Entorno verificado: Python 3.12.10 (Windows). Versiones fijadas con `==` para que
+# una reinstall reproduzca los resultados: la pipeline publica cifras con cuatro
+# decimales y varias de ellas (SHAP, XGBoost) cambian con la version.
+#
+# Comprobado con `pip freeze` contra el entorno en el que se generaron las tablas de
+# `results/tables/`. Si se actualiza alguna, hay que volver a ejecutar
+# `python scripts/pipeline_moid_pha.py` y regenerar las cifras del README.
 
-# Core scientific computing
-numpy==2.2.5
-pandas==2.3.3
+# Nucleo numerico
+numpy==2.5.3
+pandas==3.0.6
 scipy==1.16.2
 
-# Machine Learning
+# Machine learning
 scikit-learn==1.6.1
 xgboost==3.2.0
-imbalanced-learn==0.14.2
 
-# Explainability
+# Explicabilidad
 shap==0.51.0
 
-# Visualization
-matplotlib==3.10.6
+# Visualizacion
+matplotlib==3.11.2
 seaborn==0.13.2
 
-# Data acquisition
+# Adquisicion de datos
 requests==2.34.2
 
-# Jupyter / execution
-jupyter>=1.0.0
-ipykernel>=6.25.0
-# >=7.17.1: versiones anteriores tienen path traversal al exportar notebooks
-# (GHSA-4c99-qj7h-p3vg, GHSA-7jqv-fw35-gmx9) y busqueda de rutas no controlada
-# en Windows (GHSA-xm59-rqc7-hhvf).
+# Tests
+pytest==9.1.1
+
+# Ejecucion de notebooks. `nbconvert>=7.17.1`: versiones anteriores tienen path
+# traversal al exportar (GHSA-4c99-qj7h-p3vg, GHSA-7jqv-fw35-gmx9) y busqueda de
+# rutas no controlada en Windows (GHSA-xm59-rqc7-hhvf).
 nbconvert>=7.17.1
+ipykernel>=6.25.0

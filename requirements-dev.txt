@@ -1,6 +1,8 @@
-# Dependencias solo de desarrollo (bateria de tests). El analisis en si solo
-# necesita requirements.txt.
+# Entorno de desarrollo. Hereda de requirements.txt y anade lo que solo hace falta
+# para ejecutar `python -m pytest`, no para reproducir los resultados.
 -r requirements.txt
 
-pytest==9.1.1
-pytest-cov==7.1.0
+# Cobertura: mide que tests se ejecutan, y sobre todo cuales no. Un porcentaje alto
+# con Line Coverage sobre un solo archivo no dice nada; la configuracion de abajo
+# excluye los scripts que no tienen tests propios.
+pytest-cov>=5.0

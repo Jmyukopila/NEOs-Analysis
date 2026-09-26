@@ -1,0 +1,22 @@
+# Fijar la codificacion de los CSV de resultados.
+#
+# Sin esto, un CSV con acentos se abre con la codificacion local de quien lo abre y
+# sale con `Ã³` en lugar de `ó`. Es el mismo fallo que hacia ilegibles los nombres
+# de columna en los graficos, y en un CSV de resultados significa que las cifras
+# van acompanadas de un texto que no se puede leer.
+*.csv text eol=lf encoding=utf-8
+*.json text eol=lf encoding=utf-8
+*.md text eol=lf encoding=utf-8
+*.py text eol=lf encoding=utf-8
+*.ipynb text eol=lf encoding=utf-8
+
+# Los datos congelados son binarios a proposito: 340k filas de CSV de la API de JPL
+# pesan 59 MB, y con `diff` de linea cualquier cambio de una coma genera un diff
+# ilegible. El hash SHA-256 de `data/snapshot_info.json` es lo que verifica el
+# contenido; la marca `-diff` solo evita el diff, no la comprobacion.
+data/close_approaches_v*.csv -diff -merge linguist-generated=true
+
+# Figuras: binarias.
+*.png binary
+*.jpg binary
+*.svg text eol=lf
