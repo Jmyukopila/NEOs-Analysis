@@ -50,6 +50,22 @@ El análisis está dividido en notebooks exploratorios y scripts de ejecución d
 3. **`notebooks/regresion_moid_y_prueba_historica.ipynb`** — ejecuta el análisis profundo de regresión, restricciones físicas y la simulación histórica pre-2000.
 4. **`scripts/`** — scripts de validación y predicción como `predict_moid.py` (regresión unificada con restricciones físicas) y `verify_hazard_prediction.py` (verificación de peligrosidad temporal).
 
+Ambos notebooks y `scripts/verificar_discrepancias.py` comparten el paquete
+**`neos/`**, donde viven una sola vez las constantes y las operaciones comunes:
+
+- `neos/constantes.py` — umbrales de la definición PHA (`MOID ≤ 0.05 au`, `H ≤ 22`),
+  constantes físicas (albedo asumido, `au`, `μ⊕`), `dist-max`, la semilla
+  `random_state = 20`, los conjuntos de features y las rutas del repo.
+- `neos/datos.py` — descarga CAD/SBDB con cache, limpieza de fechas, imputación del
+  diámetro desde `H`, etiqueta proxy, agregación a nivel objeto y estadísticos de
+  población.
+- `neos/graficos.py` — guardado uniforme de figuras en `results/figures/` y barras
+  agrupadas.
+- `neos/modelos.py` — los tres clasificadores, el CV repetido y las métricas.
+
+Las rutas del paquete son absolutas (ancladas a la raíz del repo), así que las
+figuras y los CSV se resuelven igual sea cual sea el directorio de trabajo.
+
 ## Características principales
 
 ### 1. Obtención y etiquetado de datos
