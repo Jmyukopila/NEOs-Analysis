@@ -23,4 +23,7 @@ requests==2.34.2
 # Jupyter / execution
 jupyter>=1.0.0
 ipykernel>=6.25.0
-nbconvert>=7.0.0
+# >=7.17.1: versiones anteriores tienen path traversal al exportar notebooks
+# (GHSA-4c99-qj7h-p3vg, GHSA-7jqv-fw35-gmx9) y busqueda de rutas no controlada
+# en Windows (GHSA-xm59-rqc7-hhvf).
+nbconvert>=7.17.1
