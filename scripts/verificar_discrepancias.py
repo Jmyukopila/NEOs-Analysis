@@ -15,13 +15,29 @@ import os
 import sys
 
 import numpy as np
+import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from neos import datos
-from neos.constantes import ALBEDO_ASUMIDO, RUTA_SBDB, UMBRAL_H, UMBRAL_MOID
+from neos import datos, etiquetas
+from neos.constantes import (
+    ALBEDO_ASUMIDO,
+    DIR_DATOS,
+    FACTOR_H_D,
+    TOL_DESVIACION_MOID_PP,
+    TOL_DIST_MAX,
+    TOL_FRAC_CENSURA,
+    UMBRAL_H,
+    UMBRAL_MOID,
+)
 
 datos.configurar_salida_utf8()
+
+# Los umbrales de estas comprobaciones salen de `neos.constantes` en vez de estar
+# escritos aquí. Antes el script tenía sus propias copias, y fue así como una
+# comprobación siguió midiendo con un criterio mientras el resto del proyecto ya
+# usaba otro: dos números iguales en dos sitios que dejan de estarlo en cuanto
+# alguien cambia uno de los dos.
 
 fallos = []
 
@@ -40,44 +56,62 @@ def info(mensaje):
     print(f"  · INFO   {mensaje}")
 
 
-def cargar():
+def cargar(ruta_cad=None, verificar=False):
+    """Carga el catálogo y devuelve (df, observados, por_objeto).
+
+    `verificar=False` por defecto: este script se ejecuta en tests con catálogos
+    sintéticos en `tmp_path`, que no tienen nada que ver con el snapshot congelado y
+    cuyo hash no está en `snapshot_info.json`. La verificación se hace una vez, en
+    el entry point real (`main`), no en cada bloque.
+    """
     try:
-        df = datos.cargar_close_approaches()
+        df = datos.cargar_close_approaches(ruta=ruta_cad, solo_observadas=False,
+                                           verificar=verificar)
+    except SystemExit:
+        raise
     except (FileNotFoundError, ValueError) as e:
         sys.exit(str(e))
     obs = df[df["post_discovery"] == 1]
     obj = datos.agregar_por_objeto(
         obs, columnas=["distnom_min", "distmin_min", "H_obs", "H_sbdb", "moid",
-                       "pha", "n_appro"])
+                        "pha", "n_appro"], con_vinf_closest=False)
     return df, obs, obj
 
 
 def a_censura(df, obj):
+    """Las cinco señales de que el catálogo está censurado justo en el umbral PHA.
+
+    Un catálogo descargado con el `dist-max` por defecto de la CAD API (0.05 au) no
+    está sesgado: está *censurado*, y el sesgo se ve por cinco vías independientes.
+    La más evidente es que el 100 % de los objetos queda dentro del umbral, lo que es
+    imposible en una población real.
+    """
     bloque("A", "CENSURA EN EL UMBRAL PHA  (corregida con dist-max=0.5)")
     dmax = df["CA DistanceNominal (au)"].max()
-    veredicto(dmax > 0.06,
-              f"max(dist) = {dmax:.4f} au — la muestra llega más allá del umbral 0.05")
+    veredicto(dmax > TOL_DIST_MAX,
+              f"max(dist) = {dmax:.4f} au — la muestra llega más allá del umbral {UMBRAL_MOID}")
 
     frac = (obj.distnom_min <= UMBRAL_MOID).mean()
-    veredicto(frac < 0.95,
-              f"objetos con paso observado <= 0.05 au: {100*frac:.1f}% (censurado daba 100%)")
+    veredicto(frac < TOL_FRAC_CENSURA,
+              f"objetos con paso observado <= {UMBRAL_MOID} au: {100*frac:.1f}% "
+              f"(censurado daba 100%)")
 
     v = obj.dropna(subset=["moid"])
     fm = (v.moid <= UMBRAL_MOID).mean()
-    veredicto(fm < 0.95,
-              f"objetos con MOID <= 0.05 au: {100*fm:.1f}% (censurado daba 99.7%)")
+    veredicto(fm < TOL_FRAC_CENSURA,
+              f"objetos con MOID <= {UMBRAL_MOID} au: {100*fm:.1f}% (censurado daba 99.7%)")
 
     w = obj.dropna(subset=["pha", "H_sbdb"])
     acc = ((w.H_sbdb <= UMBRAL_H).astype(int) == w.pha).mean()
-    veredicto(acc < 0.95,
-              f"PHA == (H<=22) solo el {100*acc:.1f}% — la etiqueta ya no es un umbral único "
-              f"(censurado daba 99.6%)")
+    veredicto(acc < TOL_FRAC_CENSURA,
+              f"PHA == (H<={UMBRAL_H:g}) solo el {100*acc:.1f}% — la etiqueta ya no es un "
+              f"umbral único (censurado daba 99.6%)")
 
-    proxy = datos.etiqueta_proxy(obj.H_obs, obj.distmin_min)
+    proxy = etiquetas.etiqueta_proxy(obj.H_obs, obj.distnom_min)
     igual = (proxy == (obj.H_obs <= UMBRAL_H).astype(int)).mean()
-    veredicto(igual < 0.95,
-              f"PHA_proxy == (H<=22) solo el {100*igual:.1f}% — la condición de distancia "
-              f"ya discrimina (censurado daba 100%)")
+    veredicto(igual < TOL_FRAC_CENSURA,
+              f"PHA_proxy == (H<={UMBRAL_H:g}) solo el {100*igual:.1f}% — la condición de "
+              f"distancia ya discrimina (censurado daba 100%)")
 
 
 def b_h_definicional(df):
@@ -103,23 +137,32 @@ def c_features_redundantes(df):
     info("Ambas se excluyen del conjunto exploratorio: quedan dist, v_inf y H.")
 
 
-def d_sesgo_muestreo(obj):
+def d_sesgo_muestreo(obj, ruta_sbdb=None):
+    """Compara la población del catálogo CAD con la de toda la SBDB.
+
+    La comparación es por *condición*, no solo por prevalencia de PHA: la
+    prevalencia es el producto de dos efectos (MOID y H) y se pueden cancelar, así
+    que dos poblaciones con prevalencias iguales pueden tener sesgos opuestos.
+    """
     bloque("D", "SESGO DE MUESTREO LEÍDO POR CONDICIÓN  (corregida)")
-    if not os.path.exists(RUTA_SBDB):
+    ruta_sbdb = ruta_sbdb or os.path.join(DIR_DATOS, "sbdb_neo.csv")
+    if not os.path.exists(ruta_sbdb):
         info("omitido: falta data/sbdb_neo.csv")
         return
-    s = datos.marcar_en_catalogo(datos.cargar_sbdb(), obj.Object)
+    s = datos.marcar_en_catalogo(datos.cargar_sbdb(ruta_sbdb), obj.Object)
 
-    print(f"  {'población':<26} {'n':>8} {'PHA':>7} {'MOID<=0.05':>11} {'H<=22':>7}")
+    print(f"  {'poblacion':<26} {'n':>8} {'PHA':>7} {'MOID':>11} {'H':>7}")
     ref = {}
-    for lab, sub in [("todos los NEOs (SBDB)", s), ("en el catálogo CAD", s[s.en_cat])]:
+    for lab, sub in [("todos los NEOs (SBDB)", s), ("en el catalogo CAD", s[s.en_cat])]:
         st = datos.estadisticas_poblacion(sub)
         ref[lab] = st
         print(f"  {lab:<26} {st['n']:>8,} {st['pha']:>6.1f}% "
               f"{st['moid']:>10.1f}% {st['h']:>6.1f}%")
-    dm = abs(ref["en el catálogo CAD"]["moid"] - ref["todos los NEOs (SBDB)"]["moid"])
-    veredicto(dm < 25, f"desviación en MOID<=0.05 respecto a la población: {dm:.1f} pp "
-                       f"(censurado eran 45.6 pp)")
+    pobl, cat = ref["todos los NEOs (SBDB)"], ref["en el catalogo CAD"]
+    for clave, etiqueta in (("moid", f"MOID<={UMBRAL_MOID}"), ("h", f"H<={UMBRAL_H:g}")):
+        veredicto(abs(cat[clave] - pobl[clave]) < TOL_DESVIACION_MOID_PP,
+                  f"desviacion en {etiqueta} respecto a la poblacion: "
+                  f"{abs(cat[clave] - pobl[clave]):.1f} pp (censurado eran 45.6 pp)")
 
 
 def e_dist_min(obj):
@@ -156,21 +199,38 @@ def h_albedo():
 
 
 def i_flag(obj):
+    """Cuánto de la etiqueta se puede reconstruir y cuánto no.
+
+    El techo de exactitud importa para interpretar cualquier métrica: si la regla
+    `MOID<=0.05 & H<=22` solo coincide con el flag oficial en el 99.87 %, entonces
+    un clasificador que alcance esa cifra está reproduciendo el flag, no
+    adivinando, y por encima de ella está midiendo algo que la propia definición
+    no puede expresar.
+    """
     bloque("I", "REPRODUCIBILIDAD DEL FLAG OFICIAL  (heredada: techo de exactitud)")
     w = obj.dropna(subset=["pha", "H_sbdb", "moid"])
-    regla = datos.etiqueta_proxy(w.H_sbdb, w.moid)
-    info(f"regla exacta (H<=22 & MOID<=0.05) vs flag pha: {100*(regla == w.pha).mean():.2f}% "
-         f"— techo de exactitud alcanzable")
+    regla = etiquetas.etiqueta_pha(w.moid, w.H_sbdb)
+    info(f"regla exacta (MOID<={UMBRAL_MOID} & H<={UMBRAL_H:g}) vs flag pha: "
+         f"{100*(regla == w.pha).mean():.2f}% — techo de exactitud alcanzable")
 
 
-def main():
-    df, obs, obj = cargar()
+def main(ruta_cad=None, ruta_sbdb=None, verificar=True):
+    """Ejecuta los nueve bloques y devuelve 1 si algún bloque corregible falla.
+
+    `verificar=True` comprueba el sha256 del snapshot antes de nada. Un script de
+    integridad que no comprueba la integridad del fichero que está leyendo no tiene
+    sentido: si el CSV cambia y el resto de comprobaciones siguen dando OK, eso mismo
+    es un hallazgo.
+    """
+    if verificar:
+        datos.verificar_snapshot(ruta_cad)
+    df, obs, obj = cargar(ruta_cad=ruta_cad, verificar=False)
     print(f"Dataset: {len(df):,} eventos ({len(obs):,} observados), "
           f"{obj.Object.nunique():,} objetos con evento observado")
     a_censura(df, obj)
     b_h_definicional(df)
     c_features_redundantes(df)
-    d_sesgo_muestreo(obj)
+    d_sesgo_muestreo(obj, ruta_sbdb=ruta_sbdb)
     e_dist_min(obj)
     f_retroactivas(df)
     g_moid_epoca(obj)
@@ -179,13 +239,14 @@ def main():
 
     print("\n" + "=" * 78)
     if fallos:
-        print(f"{len(fallos)} COMPROBACIÓN(ES) FALLIDA(S):")
+        print(f"{len(fallos)} COMPROBACION(ES) FALLIDA(S):")
         for f in fallos:
             print(f"  - {f}")
         sys.exit(1)
     print("Todas las comprobaciones corregibles pasan.")
-    print("Detalle e interpretación en docs/05-discrepancias.md")
+    print("Detalle e interpretacion en docs/05-discrepancias.md")
     print("=" * 78)
+    return 0
 
 
 if __name__ == "__main__":

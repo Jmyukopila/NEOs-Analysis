@@ -40,13 +40,14 @@ try:
 except ImportError:
     HAS_XGB = False
 
-# Asegurar codificación utf-8 en Windows terminal
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
-
-warnings.filterwarnings('ignore')
-
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if RAIZ not in sys.path:
+    sys.path.insert(0, RAIZ)
+
+from neos import datos as _datos  # noqa: E402  (necesita RAIZ en sys.path)
+
+_datos.configurar_salida_utf8()
+
 DIR_DATA = os.path.join(RAIZ, "data")
 DIR_FIG = os.path.join(RAIZ, "results", "figures")
 DIR_TAB = os.path.join(RAIZ, "results", "tables")
@@ -54,8 +55,21 @@ DIR_TAB = os.path.join(RAIZ, "results", "tables")
 os.makedirs(DIR_FIG, exist_ok=True)
 os.makedirs(DIR_TAB, exist_ok=True)
 
-SEED = 42
-UMBRAL_MOID = 0.05
+# Antes: `warnings.filterwarnings('ignore')` global. Ocultaba los avisos que
+# importan: los de XGBoost sobre columnas con todo NaN, los de sklearn sobre
+# StratifiedKFold con clases desbalanceadas y los de division por cero. Se
+# filtra solo lo que es ruido conocido y reproducible, y el resto se deja pasar.
+warnings.filterwarnings("ignore", category=FutureWarning, module="sklearn")
+warnings.filterwarnings("ignore", category=UserWarning, message=".*SMOTE.*")
+
+from neos.constantes import (  # noqa: E402
+    RANDOM_STATE, UMBRAL_MOID, UMBRAL_H, FACTOR_H_D,
+)
+from neos.semillas import fijar_semillas_todas  # noqa: E402
+
+SEED = RANDOM_STATE
+fijar_semillas_todas(SEED)
+
 THRESHOLD_PROB = 0.35
 FEATURES = ['distnom_min', 'vinf_max', 'H_obs', 'n_appro', 'dist_unc_med']
 
@@ -424,7 +438,9 @@ def evaluar_prueba_historica(obj, gb_name):
 
     ax5 = fig.add_subplot(gs[1, 1])
     errores = {k: np.abs(y_hist - v) for k, v in modelos_h.items()}
-    ax5.boxplot(list(errores.values()), labels=list(errores.keys()),
+    # seaborn>=0.13 pasa `labels` a matplotlib>=3.9, donde el argumento es `tick_labels`.
+    # Con la firma antigua matplotlib lo descarta y las cajas salen sin nombre.
+    ax5.boxplot(list(errores.values()), tick_labels=list(errores.keys()),
                 patch_artist=True, boxprops=dict(facecolor='#d6eaf8', color='navy'),
                 medianprops=dict(color='red', linewidth=2))
     ax5.axhline(mae_base, color=NARANJA, ls='--', lw=1.5, label=f'Baseline MAE={mae_base:.4f}')
@@ -456,7 +472,7 @@ def evaluar_prueba_historica(obj, gb_name):
     fig, axes = plt.subplots(1, 2, figsize=(15, 6))
     ax = axes[0]
     zonas_data = df_res.groupby('zona_moid', observed=True)['error_abs_ens_rest'].apply(list)
-    ax.boxplot(list(zonas_data.values), labels=[str(z) for z in zonas_data.index],
+    ax.boxplot(list(zonas_data.values), tick_labels=[str(z) for z in zonas_data.index],
                patch_artist=True, boxprops=dict(facecolor='#d5e8f8', color='navy'),
                medianprops=dict(color='red', lw=2.5), flierprops=dict(marker='.', ms=4, alpha=0.5))
     ax.set_ylabel('Error Absoluto MOID (au)'); ax.set_title('Distribución del Error por Zona Orbital (NEOs Históricos)')

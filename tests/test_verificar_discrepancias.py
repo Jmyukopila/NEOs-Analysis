@@ -55,20 +55,20 @@ def test_bloque_e_info_solo_imprimen(vd, capsys):
 
 def test_cargar_sin_csv_aborta_con_instrucciones(vd):
     with pytest.raises(SystemExit) as exc:
-        vd.cargar()
+        vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     assert "ProyectoNeoRework_data.ipynb" in str(exc.value)
 
 
 def test_cargar_sin_columna_post_discovery_aborta(vd, escribir_cad):
     escribir_cad(frame_sano().drop(columns=["post_discovery"]))
     with pytest.raises(SystemExit) as exc:
-        vd.cargar()
+        vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     assert "post_discovery" in str(exc.value)
 
 
 def test_cargar_filtra_eventos_integrados_y_agrega_por_objeto(vd, escribir_cad):
     escribir_cad(frame_sano())
-    df, obs, obj = vd.cargar()
+    df, obs, obj = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
 
     assert len(df) == 5
     assert len(obs) == 4  # el evento con post_discovery=0 queda fuera
@@ -87,7 +87,7 @@ def test_cargar_agrega_el_minimo_entre_varios_eventos_observados(vd, escribir_ca
         evento("multiple", 0.20, 19.0, moid=0.11, pha=0),
         evento("multiple", 0.08, 18.5, moid=0.11, pha=0),
     ]))
-    _, _, obj = vd.cargar()
+    _, _, obj = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     fila = obj.iloc[0]
     assert fila.distnom_min == pytest.approx(0.08)
     assert fila.H_obs == pytest.approx(18.5)
@@ -100,7 +100,7 @@ def test_cargar_agrega_el_minimo_entre_varios_eventos_observados(vd, escribir_ca
 
 def test_a_censura_pasa_con_catalogo_no_censurado(vd, escribir_cad, capsys):
     escribir_cad(frame_sano())
-    df, _, obj = vd.cargar()
+    df, _, obj = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     vd.a_censura(df, obj)
     assert vd.fallos == []
     assert "FALLO" not in capsys.readouterr().out
@@ -115,7 +115,7 @@ def test_a_censura_detecta_las_cinco_senales_de_un_catalogo_censurado(
         evento("b", 0.02, 25.0, moid=0.02, pha=0),
         evento("c", 0.03, 20.0, moid=0.03, pha=1),
     ]))
-    df, _, obj = vd.cargar()
+    df, _, obj = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     vd.a_censura(df, obj)
     assert len(vd.fallos) == 5
 
@@ -127,7 +127,7 @@ def test_a_censura_ignora_moid_ausente_al_medir_la_fraccion(vd, escribir_cad,
         evento("con-moid-2", 0.01, 18.0, moid=0.02, pha=1),
         evento("sin-moid", 0.02, 21.0, moid=None, pha=None),
     ]))
-    df, _, obj = vd.cargar()
+    df, _, obj = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     vd.a_censura(df, obj)
     # 1 de los 2 objetos con MOID esta bajo el umbral: 50%, no 33%
     assert "MOID <= 0.05 au: 50.0%" in capsys.readouterr().out
@@ -189,7 +189,7 @@ def _sbdb(filas):
 
 def test_d_se_omite_si_falta_el_catalogo_sbdb(vd, escribir_cad, capsys):
     escribir_cad(frame_sano())
-    _, _, obj = vd.cargar()
+    _, _, obj = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     vd.d_sesgo_muestreo(obj)
     assert "omitido: falta data/sbdb_neo.csv" in capsys.readouterr().out
     assert vd.fallos == []
@@ -201,19 +201,25 @@ def test_d_pasa_cuando_el_catalogo_representa_a_la_poblacion(vd, escribir_cad,
         evento("1", 0.01, 18.0, moid=0.01, pha=1),
         evento("2", 0.30, 19.0, moid=0.30, pha=0),
     ]))
-    _, _, obj = vd.cargar()
+    _, _, obj = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
+    # El catalogo CAD tiene 2 objetos: uno con MOID <= 0.05 y otro con MOID > 0.05,
+    # y los dos con H <= 22. O sea 50 % en MOID y 100 % en H. La poblacion lleva
+    # 2 de 4 bajo 0.05 au y los 4 por debajo de H=22, con lo que la desviacion es
+    # 0 pp en las dos condiciones y el test comprueba que se evaluan por separado.
     _sbdb([
         ("1", "Y", 0.01, 18.0),
         ("2", "N", 0.30, 19.0),
-        ("3", "N", 0.40, 25.0),
-        ("4", "Y", 0.02, 17.0),
-    ]).to_csv(vd.RUTA_SBDB, index=False)
+        ("3", "N", 0.02, 20.0),
+        ("4", "N", 0.50, 21.0),
+    ]).to_csv(vd.RUTA_SBDB_TEST, index=False)
 
-    vd.d_sesgo_muestreo(obj)
+    vd.d_sesgo_muestreo(obj, ruta_sbdb=vd.RUTA_SBDB_TEST)
     salida = capsys.readouterr().out
     assert "todos los NEOs (SBDB)" in salida
-    assert "en el catálogo CAD" in salida
-    assert vd.fallos == []  # 50% vs 50%: desviacion 0 pp
+    assert "en el catalogo CAD" in salida
+    # 50 % vs 50 % en MOID y 100 % vs 100 % en H: desviacion 0 pp en las dos.
+    assert vd.fallos == []
+    assert salida.count("OK") >= 2
 
 
 def test_d_falla_cuando_el_catalogo_esta_sesgado_en_moid(vd, escribir_cad):
@@ -223,24 +229,27 @@ def test_d_falla_cuando_el_catalogo_esta_sesgado_en_moid(vd, escribir_cad):
         evento("1", 0.01, 18.0, moid=0.01, pha=1),
         evento("2", 0.02, 17.0, moid=0.02, pha=1),
     ]))
-    _, _, obj = vd.cargar()
+    _, _, obj = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     _sbdb([("1", "Y", 0.01, 18.0), ("2", "Y", 0.02, 17.0)]
           + [(str(i), "N", 0.40, 25.0) for i in range(3, 11)]
-          ).to_csv(vd.RUTA_SBDB, index=False)
+          ).to_csv(vd.RUTA_SBDB_TEST, index=False)
 
-    vd.d_sesgo_muestreo(obj)
-    assert len(vd.fallos) == 1
-    assert "desviación en MOID<=0.05" in vd.fallos[0]
+    vd.d_sesgo_muestreo(obj, ruta_sbdb=vd.RUTA_SBDB_TEST)
+    # Fallan las dos condiciones: los dos objetos del catalogo CAD estan bajo
+    # 0.05 au y por debajo de H=22, mientras la poblacion solo lo esta en un 20 %.
+    assert len(vd.fallos) == 2
+    assert any("desviacion en MOID" in f for f in vd.fallos)
+    assert any("desviacion en H" in f for f in vd.fallos)
 
 
 def test_d_convierte_valores_no_numericos_del_sbdb(vd, escribir_cad, capsys):
     escribir_cad(frame_cad([evento("1", 0.01, 18.0, moid=0.01, pha=1)]))
-    _, _, obj = vd.cargar()
+    _, _, obj = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     _sbdb([("1", "Y", 0.01, 18.0),
            ("2", "N", "", ""),          # campos vacios de la SBDB
-           ("3", "N", "n/a", "n/a")]).to_csv(vd.RUTA_SBDB, index=False)
+           ("3", "N", "n/a", "n/a")]).to_csv(vd.RUTA_SBDB_TEST, index=False)
 
-    vd.d_sesgo_muestreo(obj)
+    vd.d_sesgo_muestreo(obj, ruta_sbdb=vd.RUTA_SBDB_TEST)
     # Solo 1 de los 3 NEOs tiene MOID: la fraccion se calcula sobre ese
     assert "100.0%" in capsys.readouterr().out
 
@@ -254,7 +263,7 @@ def test_e_cuenta_objetos_con_cota_3sigma_degenerada(vd, escribir_cad, capsys):
         evento("rasante", 0.02, 18.0, dist_min=1e-9, moid=0.02, pha=1),
         evento("normal", 0.30, 19.0, moid=0.30, pha=0),
     ]))
-    _, _, obj = vd.cargar()
+    _, _, obj = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     vd.e_dist_min(obj)
     assert "min(dist_min) < 1e-5 au: 1" in capsys.readouterr().out
     assert vd.fallos == []
@@ -262,7 +271,7 @@ def test_e_cuenta_objetos_con_cota_3sigma_degenerada(vd, escribir_cad, capsys):
 
 def test_f_reporta_la_fraccion_de_eventos_observados(vd, escribir_cad, capsys):
     escribir_cad(frame_sano())
-    df, _, _ = vd.cargar()
+    df, _, _ = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     vd.f_retroactivas(df)
     salida = capsys.readouterr().out
     assert "eventos observados: 4 de 5 (80.0%)" in salida
@@ -271,7 +280,7 @@ def test_f_reporta_la_fraccion_de_eventos_observados(vd, escribir_cad, capsys):
 
 def test_g_mide_evolucion_secular_del_moid(vd, escribir_cad, capsys):
     escribir_cad(frame_sano())
-    _, _, obj = vd.cargar()
+    _, _, obj = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     vd.g_moid_epoca(obj)
     # solo "cercano-grande" tiene MOID (0.02) > distancia observada (0.01)
     assert "distancia observada mínima: 25.0%" in capsys.readouterr().out
@@ -287,7 +296,7 @@ def test_h_albedo_reporta_los_factores_de_escala_del_diametro(vd, capsys):
 
 def test_i_flag_mide_el_techo_de_exactitud(vd, escribir_cad, capsys):
     escribir_cad(frame_sano())
-    _, _, obj = vd.cargar()
+    _, _, obj = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     vd.i_flag(obj)
     assert "vs flag pha: 100.00%" in capsys.readouterr().out
 
@@ -299,7 +308,7 @@ def test_i_flag_detecta_objetos_que_la_regla_no_reproduce(vd, escribir_cad,
         # H y MOID cumplen la regla pero el flag oficial dice que no es PHA
         evento("discrepa", 0.02, 19.0, moid=0.02, pha=0),
     ]))
-    _, _, obj = vd.cargar()
+    _, _, obj = vd.cargar(ruta_cad=vd.RUTA_CAD_TEST)
     vd.i_flag(obj)
     assert "vs flag pha: 50.00%" in capsys.readouterr().out
 
@@ -310,7 +319,7 @@ def test_i_flag_detecta_objetos_que_la_regla_no_reproduce(vd, escribir_cad,
 
 def test_main_termina_sin_error_con_un_catalogo_sano(vd, escribir_cad, capsys):
     escribir_cad(frame_sano())
-    vd.main()
+    vd.main(ruta_cad=vd.RUTA_CAD_TEST, ruta_sbdb=vd.RUTA_SBDB_TEST, verificar=False)
     salida = capsys.readouterr().out
     assert "Todas las comprobaciones corregibles pasan." in salida
     assert "Dataset: 5 eventos (4 observados), 4 objetos" in salida
@@ -322,16 +331,17 @@ def test_main_sale_con_codigo_1_y_lista_los_fallos(vd, escribir_cad, capsys):
         evento("b", 0.02, 25.0, moid=0.02, pha=0),
     ]))
     with pytest.raises(SystemExit) as exc:
-        vd.main()
+        vd.main(ruta_cad=vd.RUTA_CAD_TEST, ruta_sbdb=vd.RUTA_SBDB_TEST,
+                verificar=False)
     assert exc.value.code == 1
     salida = capsys.readouterr().out
-    assert "COMPROBACIÓN(ES) FALLIDA(S)" in salida
+    assert "COMPROBACION(ES) FALLIDA(S)" in salida
     assert len(vd.fallos) == 5
 
 
 def test_main_recorre_todos_los_bloques(vd, escribir_cad, capsys):
     escribir_cad(frame_sano())
-    vd.main()
+    vd.main(ruta_cad=vd.RUTA_CAD_TEST, ruta_sbdb=vd.RUTA_SBDB_TEST, verificar=False)
     salida = capsys.readouterr().out
     for clave in "ABCDEFGHI":
         assert f"[{clave}]" in salida

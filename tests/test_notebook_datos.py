@@ -187,14 +187,43 @@ def test_descargar_cad_elimina_eventos_duplicados_en_la_frontera(nb_datos,
     assert len(df) == 2
 
 
-def test_descargar_cad_ignora_tramos_vacios(nb_datos, monkeypatch):
+def test_descargar_cad_avisa_de_los_tramos_vacios(nb_datos, monkeypatch, capsys):
+    """Un tramo sin eventos se avisa, pero el dataset vacio completo es un error.
+
+    `descargar_cad` distingue los dos casos a proposito: que un tramo no tenga
+    eventos es legitimo, pero que no tenga ninguno en toda la consulta significa que
+    algo fallo (dist-max, fechas, conectividad) y devolver un dataframe vacio lo
+    camufla. Antes de este cambio, un fallo de red silencioso producia un dataset
+    vacio y el error aparecia tres celdas mas tarde.
+    """
     monkeypatch.setattr(requests, "get",
                         lambda *a, **k: RespuestaFalsa({"count": 0}))
-    df = nb_datos["descargar_cad"](dist_max=0.5, anio_ini=2020, paso=1000)
-    assert df.empty
+    with pytest.raises(RuntimeError, match="ningún evento"):
+        nb_datos["descargar_cad"](dist_max=0.5, anio_ini=2020, paso=1000)
+    assert "Tramos sin eventos" in capsys.readouterr().out
+
+
+def test_descargar_cad_ignora_tramos_vacios_si_otros_tramos_traen_datos(
+        nb_datos, monkeypatch, capsys):
+    """Un tramo vacio en medio de una consulta con datos no es un error."""
+    def get(*a, **k):
+        anio = k["params"]["date-min"][:4]
+        if anio == "1990":
+            return RespuestaFalsa({"count": 0})
+        return RespuestaFalsa(payload([[f"obj-{anio}", f"{anio}-Jan-01 00:00", "0.1"]]))
+
+    monkeypatch.setattr(requests, "get", get)
+    df = nb_datos["descargar_cad"](dist_max=0.5, anio_ini=1900, paso=10)
+    assert len(df) == len(set(c for c in df["cd"])) > 0
+    assert "1990-2000" in capsys.readouterr().out
 
 
 def test_descargar_cad_reintenta_tras_un_fallo_de_red(nb_datos, monkeypatch):
+    """Un fallo de red en el primer intento se reintenta con espera creciente.
+
+    El tramo se reintenta entero, no se continúa con el siguiente: un tramo a medias
+    dejaría huecos en la serie temporal de forma silenciosa.
+    """
     esperas = []
     intentos = {"n": 0}
 
@@ -213,8 +242,42 @@ def test_descargar_cad_reintenta_tras_un_fallo_de_red(nb_datos, monkeypatch):
     assert len(df) == 1
 
 
+def test_descargar_cad_reintenta_una_respuesta_truncada(nb_datos, monkeypatch):
+    """`count` mayor que las filas recibidas es una respuesta cortada: reintenta.
+
+    Es el fallo mas frecuente de esta API, y el mas silencioso: la respuesta llega
+    con codigo 200 y JSON valido, asi que `raise_for_status` no la ve. Sin esta
+    comprobacion, el dataset se construiria con un hueco temporal y ninguna figura
+    del analisis lo delataria.
+    """
+    intentos = {"n": 0}
+
+    def truncada(*a, **k):
+        intentos["n"] += 1
+        if intentos["n"] == 1:
+            # count=2 pero solo llega 1 fila
+            return RespuestaFalsa({"count": 2, "fields": ["des", "cd", "dist"],
+                                   "data": [["433", "2010-Jan-01 00:00", "0.1"]]})
+        return RespuestaFalsa(payload([["433", "2010-Jan-01 00:00", "0.1"],
+                                       ["999", "2011-Jan-01 00:00", "0.2"]]))
+
+    monkeypatch.setattr(requests, "get", truncada)
+    monkeypatch.setattr(time, "sleep", lambda *_: None)
+
+    df = nb_datos["descargar_cad"](dist_max=0.5, anio_ini=2020, paso=1000)
+    assert intentos["n"] == 2
+    assert len(df) == 2
+
+
 def test_descargar_cad_propaga_el_error_tras_agotar_los_intentos(nb_datos,
                                                                 monkeypatch):
+    """Agotados los reintentos, el error dice cuantos intentos y por que fallo.
+
+    El notebook envuelve el ultimo fallo en un `RuntimeError` que incluye la
+    excepcion original, en vez de dejar que esta salga sola: un Timeout sin mencionar
+    el tramo ni el numero de intentos no dice si hay que esperar mas o cambiar los
+    parametros. La causa queda ademas en `__cause__`.
+    """
     intentos = {"n": 0}
 
     def siempre_falla(*a, **k):
@@ -224,7 +287,9 @@ def test_descargar_cad_propaga_el_error_tras_agotar_los_intentos(nb_datos,
     monkeypatch.setattr(requests, "get", siempre_falla)
     monkeypatch.setattr(time, "sleep", lambda *_: None)
 
-    with pytest.raises(requests.exceptions.Timeout):
+    with pytest.raises(RuntimeError, match="sin exito tras 3 intentos") as exc:
         nb_datos["descargar_cad"](dist_max=0.5, anio_ini=2020, paso=1000,
                                   intentos=3)
     assert intentos["n"] == 3
+    assert "2020" in str(exc.value)
+    assert isinstance(exc.value.__cause__, requests.exceptions.Timeout)

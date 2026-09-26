@@ -27,6 +27,13 @@ NB_ML = RAIZ / "notebooks" / "ProyectoNeoRework_ml.ipynb"
 # ejecutarse (todo lo demas del notebook es codigo de pipeline con efectos).
 ASIGNACIONES_NECESARIAS = {"sbdb_fields"}
 
+# Nombres que ademas deben existir en el namespace extraido para que las funciones
+# se ejecuten. Se declaran en vez de depender de que `ast` los encuentre por
+# casualidad: `descargar_cad` captura `ErrorAPI` en su `except`, y si la clase no
+# esta en el namespace el NameError aparece al primer fallo de red simulado, con un
+# mensaje que no menciona la clase que falta.
+CLASES_NECESARIAS = {"ErrorAPI"}
+
 COLUMNAS_CAD = [
     "Object",
     "Close-Approach (CA) Date",
@@ -47,9 +54,14 @@ COLUMNAS_CAD = [
     "PHA_proxy",
 ]
 
-UA_KM = 1.495978707e8
-MU_TIERRA = 3.986004418e5
-FACTOR_H_D = 1329 / 0.14 ** 0.5
+# Las constantes de física se importan de `neos.constantes` en vez de replicarse. Una
+# copia local puede divergir sin que nada lo detecte, y estas dos aparecen en las
+# aserciones de los tests precisamente para comprobar que el script y el notebook
+# coinciden: si el test usa su propia copia, comprueba que la copia coincide consigo
+# misma y el test no vale para nada.
+from neos.constantes import AU_KM, FACTOR_H_D, MU_TIERRA  # noqa: E402
+
+UA_KM = AU_KM
 
 
 def diametro_desde_h(h):
@@ -116,20 +128,25 @@ def frame_sano():
 
 
 @pytest.fixture
-def vd(tmp_path, monkeypatch):
+def vd(tmp_path):
     """Importa el script de verificacion aislado del disco y del estado global.
 
-    Cada test recibe un modulo recien importado (la lista global `fallos`
-    empieza vacia) con `RUTA_CAD`/`RUTA_SBDB` apuntando a `tmp_path`.
+    Cada test recibe un modulo recien importado (la lista global `fallos` empieza
+    vacia) y las rutas que usa, apuntando a `tmp_path`.
+
+    Las rutas se pasan como argumentos a `cargar(ruta_cad=...)` en vez de monkeypatchear
+    `RAIZ`/`RUTA_CAD` en el modulo. El script ya no define esos nombres: importan de
+    `neos.constantes`, y las pruebas llegan a un estado en el que los cuatro tests que
+    los tocaban fallaban con `AttributeError` porque `RAIZ` ya no existe ahí. Parchear
+    un atributo que el módulo no declara sólo habría movido el fallo.
     """
     spec = importlib.util.spec_from_file_location(
         f"verificar_discrepancias_{id(tmp_path)}", RUTA_SCRIPT)
     modulo = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(modulo)
-    monkeypatch.setattr(modulo, "RAIZ", str(tmp_path))
-    monkeypatch.setattr(modulo, "RUTA_CAD", str(tmp_path / "close_approaches.csv"))
-    monkeypatch.setattr(modulo, "RUTA_SBDB", str(tmp_path / "sbdb_neo.csv"))
     modulo.fallos.clear()
+    modulo.RUTA_CAD_TEST = tmp_path / "close_approaches.csv"
+    modulo.RUTA_SBDB_TEST = tmp_path / "sbdb_neo.csv"
     yield modulo
     sys.modules.pop(spec.name, None)
 
@@ -138,8 +155,23 @@ def vd(tmp_path, monkeypatch):
 def escribir_cad(vd):
     """Escribe un DataFrame en la ruta que lee el script y devuelve la ruta."""
     def _escribir(df):
-        df.to_csv(vd.RUTA_CAD, index=False)
-        return vd.RUTA_CAD
+        df.to_csv(vd.RUTA_CAD_TEST, index=False)
+        return vd.RUTA_CAD_TEST
+    return _escribir
+
+
+def _sbdb_en_ruta(ruta, filas):
+    """Escribe un CSV de SBDB mínimo con las columnas que necesita el bloque D."""
+    pd.DataFrame(filas, columns=["pdes", "pha", "moid", "H"]).to_csv(ruta, index=False)
+    return ruta
+
+
+@pytest.fixture
+def escribir_sbdb(vd):
+    """Escribe el catálogo de la SBDB que lee el bloque D."""
+    def _escribir(df):
+        df.to_csv(vd.RUTA_SBDB_TEST, index=False)
+        return vd.RUTA_SBDB_TEST
     return _escribir
 
 
@@ -159,7 +191,9 @@ def funciones_notebook(ruta):
     arbol = ast.parse(codigo_notebook(ruta))
     conservadas = []
     for nodo in arbol.body:
-        if isinstance(nodo, (ast.FunctionDef, ast.Import, ast.ImportFrom)):
+        if isinstance(nodo, (ast.FunctionDef, ast.ClassDef, ast.Import, ast.ImportFrom)):
+            if isinstance(nodo, ast.ClassDef) and nodo.name not in CLASES_NECESARIAS:
+                continue
             conservadas.append(nodo)
         elif isinstance(nodo, ast.Assign) and any(
                 isinstance(t, ast.Name) and t.id in ASIGNACIONES_NECESARIAS
@@ -167,6 +201,14 @@ def funciones_notebook(ruta):
             conservadas.append(nodo)
     ns = {"__name__": "notebook_extraido"}
     exec(compile(ast.Module(body=conservadas, type_ignores=[]), str(ruta), "exec"), ns)
+
+    # Comprobacion de que el namespace tiene lo que las funciones necesitan. Sin
+    # esto, un nombre que falta solo se descubre cuando una rama de `except` se
+    # ejecuta, es decir, unicamente en los tests que simulan un fallo.
+    faltan = sorted(CLASES_NECESARIAS - set(ns))
+    assert not faltan, (
+        f"{ruta.name}: el namespace extraido no define {faltan}. "
+        "Anadelas a CLASES_NECESARIAS en conftest.py si son necesarias.")
     return ns
 
 

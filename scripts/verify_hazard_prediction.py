@@ -291,7 +291,12 @@ def generar_graficas_cohorte(df_te, total_haz, p_rec, ml_rec, det_ambos, det_sol
 
     plt.xlabel("MOID Orbital Real (au)", fontsize=11)
     plt.ylabel("Densidad de Probabilidad", fontsize=11)
-    plt.title(f"Racionalidad de los Falsos Positivos de ML (Cohorte ≥ 2015)\n({fp_sub_008:.1f}% se concentran entre 0.05 y 0.08 au)",
+    # `fp_sub_008` se calculaba en `analizar_cohorte_moderna()` y se leía aquí, en
+    # otra función: NameError en cuanto se llegaba a esta figura. Se recalcula con
+    # los datos que recibe esta función en vez de añadir un parámetro más, porque
+    # `fp_ml` ya viene aquí y la cuenta es trivial.
+    pct_bajo_008 = (fp_ml["moid"] <= 0.08).mean() * 100 if len(fp_ml) else float("nan")
+    plt.title(f"Racionalidad de los Falsos Positivos de ML (Cohorte ≥ 2015)\n({pct_bajo_008:.1f}% se concentran entre 0.05 y 0.08 au)",
               fontsize=12, fontweight="bold")
     plt.legend(fontsize=10)
     plt.grid(True, linestyle="--", alpha=0.5)
