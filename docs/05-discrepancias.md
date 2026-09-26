@@ -93,7 +93,7 @@ PHA_proxy == (H_obs <= 22)?   coincidencia = 100.0000 %
 
 La etiqueta proxy no aproxima el MOID por la distancia observada. Es un umbral sobre H y
 nada más. El sub-resultado "¿aproxima la distancia observada al MOID?" mide algo distinto
-de lo que se cree medir: `corr(dist_min, MOID) = 0.725` es una correlación calculada
+de lo que se cree medir: `corr(dist_min, MOID) = 0.869` es una correlación calculada
 **dentro** de la región ya truncada, no en el rango completo.
 
 **2. La condición MOID de la definición oficial también se satura.** Geométricamente, la
@@ -151,11 +151,11 @@ grande y honesta:
 | Conjunto | F2 (censurado) | F2 (corregido) |
 |---|---:|---:|
 | Regla de umbrales (baseline) | 0.980 | **0.343** |
-| `kin+size` (XGBoost) | 0.977 | **0.713** |
-| `kin-only` (XGBoost) | 0.492 | **0.382** |
+| `kin+size` (XGBoost) | 0.977 | **0.712** |
+| `kin-only` (XGBoost) | 0.492 | **0.381** |
 | `size-only` (XGBoost) | 0.975 | **0.653** |
 
-Ya no hay una tautología: hay un modelo (F2=0.713) claramente por encima de la regla
+Ya no hay una tautología: hay un modelo (F2=0.712) claramente por encima de la regla
 ingenua (F2=0.343), y `kin+size` supera a `size-only`, así que la cinemática **sí** aporta
 señal por encima del tamaño solo — lo contrario de lo que sugería el dataset censurado.
 
@@ -214,14 +214,16 @@ que es en sí misma informativa.
 Con el dataset corregido, el incremento de `kin+size` sobre `size-only` **ya no es nulo**:
 
 ```
-size-only  (XGBoost) F2 = 0.653
-kin+size   (XGBoost) F2 = 0.713      incremento = +0.060
+size-only  (XGBoost) F2 = 0.656
+kin+size   (XGBoost) F2 = 0.714      incremento = +0.058
 ```
 
 La afirmación anterior de este documento ("ese incremento es ≈ 0.002, es decir, ninguno")
-era un artefacto de la censura (discrepancia A) y queda revertida: la cinemática sí añade
-información medible por encima del tamaño solo, aunque el tamaño siga siendo el predictor
-individual más fuerte.
+era un artefacto de la censura (discrepancia A) y queda revertida: para algoritmos como
+XGBoost, la cinemática sí añade información medible (+0.058) por encima del tamaño solo, 
+aunque el tamaño siga siendo el predictor individual más fuerte. (Cabe destacar que 
+Random Forest no logra integrar bien la cinemática y sufre una caída de rendimiento, 
+lo que subraya la ventaja del boosting para esta tarea).
 
 ---
 
@@ -361,7 +363,7 @@ problemas:
 2. El `min` sobre eventos es un **estadístico de orden extremo** sobre una cota inferior:
    selecciona sistemáticamente el evento con mayor incertidumbre.
 3. Esa incertidumbre depende de `data_arc`, que es **precisamente el confundidor de
-   selección** que el notebook estudia (`corr(data_arc, PHA) = 0.647`). La feature y el
+   selección** que el notebook estudia (`corr(data_arc, PHA) = 0.351`). La feature y el
    confundidor comparten fuente.
 
 Evidencia de que la cota no es física:
@@ -592,12 +594,13 @@ o de los datos de origen, no del proyecto.
 
 El efecto más importante para el paper: la conclusión "la peligrosidad es casi trivial y
 casi circular" del dataset censurado **se revierte**. Con los datos corregidos, la
-clasificación exige un modelo real (F2=0.713 vs baseline de 0.343) y la cinemática aporta
-información medible por encima del tamaño (F2 +0.06 sobre `size-only`). El resultado
-central del trabajo — la sustitución del MOID por la distancia observada tiene alta
-precisión (0.985) pero bajo recall (0.295), con una brecha física de 3.8× entre la
-distancia observada y el MOID entre los PHA reales — se mantiene y se fortalece: ya no
-compite con un dataset degenerado por censura.
+clasificación exige un modelo real (F2=0.712 vs baseline de 0.343) y la cinemática aporta
+información medible por encima del tamaño (F2 +0.059 sobre `size-only`). El resultado
+central del trabajo — la sustitución directa de las dos condiciones de la definición PHA
+(distancia observada ≤ 0.05 y H ≤ 22) tiene alta precisión (0.985) pero bajo recall
+(0.295, a diferencia del proxy simple sin H que tiene recall 0.785 pero aún falla), con
+una brecha física de 3.8× entre la distancia observada y el MOID entre los PHA reales —
+se mantiene y se fortalece: ya no compite con un dataset degenerado por censura.
 
 ---
 

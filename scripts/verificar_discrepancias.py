@@ -17,13 +17,32 @@ import sys
 import numpy as np
 import pandas as pd
 
+import glob
+
 # La consola de Windows usa cp1252 por defecto y no admite los símbolos del informe
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RUTA_CAD = os.path.join(RAIZ, "data", "close_approaches.csv")
-RUTA_SBDB = os.path.join(RAIZ, "data", "sbdb_neo.csv")
+DIR_DATA = os.path.join(RAIZ, "data")
+
+def resolver_ruta_cad():
+    ruta_std = os.path.join(DIR_DATA, "close_approaches.csv")
+    if os.path.exists(ruta_std):
+        return ruta_std
+    snaps = sorted(glob.glob(os.path.join(DIR_DATA, "close_approaches_v*.csv")))
+    if snaps:
+        return snaps[-1]
+    return None
+
+def resolver_ruta_sbdb():
+    ruta_std = os.path.join(DIR_DATA, "sbdb_neo.csv")
+    if os.path.exists(ruta_std):
+        return ruta_std
+    snaps = sorted(glob.glob(os.path.join(DIR_DATA, "sbdb_neo_v*.csv")))
+    if snaps:
+        return snaps[-1]
+    return None
 
 ALBEDO_ASUMIDO = 0.14
 FACTOR_H_D = 1329 / math.sqrt(ALBEDO_ASUMIDO)  # ≈ 3552
@@ -48,9 +67,10 @@ def info(mensaje):
 
 
 def cargar():
-    if not os.path.exists(RUTA_CAD):
-        sys.exit(f"Falta {RUTA_CAD}. Ejecuta primero data/ProyectoNeoRework_data.ipynb")
-    df = pd.read_csv(RUTA_CAD)
+    ruta_cad = resolver_ruta_cad()
+    if not ruta_cad:
+        sys.exit("Falta close_approaches.csv o su snapshot. Ejecuta primero data/ProyectoNeoRework_data.ipynb")
+    df = pd.read_csv(ruta_cad)
     if "post_discovery" not in df.columns:
         sys.exit("El CSV no tiene 'post_discovery': regenera con el notebook corregido.")
     obs = df[df["post_discovery"] == 1]
@@ -119,10 +139,11 @@ def c_features_redundantes(df):
 
 def d_sesgo_muestreo(obj):
     bloque("D", "SESGO DE MUESTREO LEÍDO POR CONDICIÓN  (corregida)")
-    if not os.path.exists(RUTA_SBDB):
-        info("omitido: falta data/sbdb_neo.csv")
+    ruta_sbdb = resolver_ruta_sbdb()
+    if not ruta_sbdb:
+        info("omitido: falta data/sbdb_neo.csv o su snapshot")
         return
-    s = pd.read_csv(RUTA_SBDB)
+    s = pd.read_csv(ruta_sbdb)
     for c in ("moid", "H"):
         s[c] = pd.to_numeric(s[c], errors="coerce")
     s["pha01"] = s["pha"].map({"Y": 1, "N": 0})

@@ -56,7 +56,7 @@ En el proyecto hay **dos** versiones de la etiqueta:
 `PHA_proxy` sustituye el MOID (orbital, no observado) por la mínima distancia de
 aproximación efectivamente registrada. Comparar ambas mide **cuánto se pierde** al
 usar solo lo observado: en el dataset actual la correlación entre distancia mínima
-observada y MOID es ≈ **0.725**.
+observada y MOID es ≈ **0.869**.
 
 ---
 
@@ -188,9 +188,9 @@ Metadatos de **calidad de la órbita**, no propiedades físicas del objeto:
 
 Estas dos columnas son **metadatos de selección**, no features. Sirven para el análisis
 de la función de selección observacional: la prevalencia de PHA entre los objetos
-descubiertos antes de 2015 es del 23.3 %, y entre los descubiertos después, del 2.4 % —
+descubiertos antes de 2015 es del 14.6 %, y entre los descubiertos después, del 2.6 % —
 no porque el cielo haya cambiado, sino porque los sondeos antiguos solo veían los
-objetos grandes y cercanos. `corr(data_arc, PHA) = 0.647` cuantifica el confundidor:
+objetos grandes y cercanos. `corr(data_arc, PHA) = 0.351` cuantifica el confundidor:
 los PHA se caracterizan mejor precisamente por ser interesantes.
 
 ---

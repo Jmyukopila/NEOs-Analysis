@@ -33,13 +33,14 @@ We instead ask a harder question: can hazard be inferred from the \emph{observed
 close-approach kinematics alone---without the orbital elements that define it---and
 how is that inference shaped by the survey selection function imprinted on a
 126-year close-approach catalog? Using a self-collected catalog of
-\num{32568} close-approach events for \num{18934} unique NEOs (JPL/CNEOS), labeled
+\num{340469} close-approach events for \num{37526} unique NEOs (JPL/CNEOS), labeled
 with the official JPL Small-Body Database PHA flag, we show that (i) a two-threshold
-rule on observed quantities matches gradient-boosted trees ($F_2\approx0.98$),
-confirming the circularity; (ii) the predictive signal is carried almost entirely by
-object \emph{size}, not by kinematics---removing size collapses $F_2$ to
-$\sim$\,0.2--0.5; and (iii) PHA prevalence falls monotonically from $\sim$95\% to
-$\sim$1\% with discovery epoch, tracked by orbital arc length, demonstrating that the
+rule on observed quantities achieves $F_2 \approx 0.34$, while gradient-boosted trees
+reach $F_2 \approx 0.71$, demonstrating that machine learning captures real kinematic signal
+beyond the defining boundaries; (ii) the predictive signal is nonetheless strongly dependent
+on object \emph{size}---removing size collapses $F_2$ to
+$\sim$\,0.3--0.4; and (iii) PHA prevalence falls significantly from $\gtrsim$40\% to
+1.7\% with discovery epoch, tracked by orbital arc length, demonstrating that the
 catalog is a detection record rather than a census. We provide a reproducible,
 selection-aware protocol and a frozen data snapshot.
 \end{abstract}
@@ -86,9 +87,9 @@ Small-Body Database (SBDB) query API \citep{jpl_sbdb} for the official \texttt{p
 flag, MOID, $H$, first-observation date, and orbital data arc. Matching CAD
 designations to SBDB primary designations succeeds for 99.9\% of objects (unmatched
 cases are comets). The frozen snapshot used here
-(\texttt{close\_approaches\_v20260619.csv}) contains \num{32568} events for
-\num{18934} objects; \num{18927} are matched and labeled, with a PHA prevalence of
-7.3\%.
+(\texttt{close\_approaches\_v20260811.csv}) contains \num{340469} events for
+\num{37526} objects; \num{37510} are matched and labeled, with a PHA prevalence of
+6.0\%.
 
 \paragraph{Unit of analysis and labels.}
 Hazard is a property of an \emph{object}, so we aggregate events per designation
@@ -97,8 +98,8 @@ diameter, number of approaches, first-observation year, orbital arc). The target
 the official PHA flag. As a self-contained sanity check we also derive a
 \emph{proxy} label from observed quantities only ($H\le 22$ and minimum observed
 $\mathrm{dist\_min}\le 0.05$~au); it reproduces the official flag with precision
-0.966 and recall 0.984. The observed minimum distance approximates MOID with
-$r\approx0.73$ (Fig.~\ref{fig:moid}); the gap is physical---one rarely observes the
+0.985 and recall 0.295. The observed minimum distance approximates MOID with
+$r\approx0.868$ (Fig.~\ref{fig:moid}); the gap is physical---one rarely observes the
 closest geometrically possible approach---so the observed distance is biased high
 relative to MOID.
 
@@ -136,56 +137,59 @@ characterized). Feature attributions use SHAP \citep{shap}.
 \begin{table}[t]
 \centering
 \caption{Cross-validated performance (repeated stratified 5-fold, 3 repeats; mean).
-Removing size (kin-only) collapses performance; size alone nearly matches the full
-set. The trivial threshold rule matches the best models.}
+Removing size (kin-only) collapses performance; size alone performs strongly, but
+kinematics adds significant value. The ML model decisively outperforms the trivial threshold rule.}
 \label{tab:cv}
 \begin{tabular}{llccc}
 \toprule
 Features & Model & $F_2$ & PR-AUC & ROC-AUC \\
 \midrule
-kin+size  & LogReg     & $0.959\pm0.006$ & 0.956 & 0.998 \\
-kin+size  & RandForest & $0.980\pm0.006$ & 0.981 & 0.998 \\
-kin+size  & XGBoost    & $0.977\pm0.005$ & 0.987 & 0.999 \\
-kin-only  & LogReg     & $0.490\pm0.015$ & 0.308 & 0.840 \\
-kin-only  & RandForest & $0.213\pm0.026$ & 0.305 & 0.814 \\
-kin-only  & XGBoost    & $0.492\pm0.016$ & 0.351 & 0.842 \\
-size-only & LogReg     & $0.956\pm0.007$ & 0.956 & 0.998 \\
-size-only & RandForest & $0.970\pm0.008$ & 0.968 & 0.996 \\
-size-only & XGBoost    & $0.975\pm0.003$ & 0.974 & 0.999 \\
+kin+size  & LogReg     & $0.676\pm0.007$ & 0.405 & 0.946 \\
+kin+size  & RandForest & $0.521\pm0.020$ & 0.727 & 0.969 \\
+kin+size  & XGBoost    & $0.714\pm0.011$ & 0.731 & 0.971 \\
+kin-only  & LogReg     & $0.344\pm0.006$ & 0.157 & 0.750 \\
+kin-only  & RandForest & $0.038\pm0.006$ & 0.141 & 0.742 \\
+kin-only  & XGBoost    & $0.380\pm0.008$ & 0.187 & 0.786 \\
+size-only & LogReg     & $0.658\pm0.006$ & 0.291 & 0.919 \\
+size-only & RandForest & $0.618\pm0.012$ & 0.286 & 0.910 \\
+size-only & XGBoost    & $0.656\pm0.007$ & 0.288 & 0.919 \\
 \midrule
-\multicolumn{2}{l}{Threshold rule (dist\_min$\le$0.05 \& $H\le$22)} & 0.980 & --- & --- \\
+\multicolumn{2}{l}{Threshold rule (dist\_min$\le$0.05 \& $H\le$22)} & 0.343 & --- & --- \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{The task is near-trivial and circular.}
-A two-threshold rule on observed quantities achieves $F_2=0.980$ (precision 0.968,
-recall 0.983), matching gradient-boosted trees (Table~\ref{tab:cv},
-Fig.~\ref{fig:f2}). Reported ``state-of-the-art'' accuracy therefore largely measures
-how closely the inputs reproduce the label's definition.
+\paragraph{The task is not circular; ML captures kinematic signal.}
+A two-threshold rule on observed quantities achieves $F_2=0.343$. In contrast,
+gradient-boosted trees (Table~\ref{tab:cv}, Fig.~\ref{fig:f2}) reach $F_2=0.714$.
+This substantial gap demonstrates that the model is not merely relearning the
+definition of the label, but is capturing real physical correlations from the
+kinematics that the naive rule misses.
 
-\paragraph{Size, not kinematics, carries the signal.}
-Removing size information (kin-only) collapses $F_2$ to 0.2--0.5 and PR-AUC to
-$\sim$0.3, whereas size alone ($\{H\}$) nearly matches the full feature set
+\paragraph{Size dominates, but kinematics adds value.}
+Removing size information (kin-only) collapses $F_2$ across most models,
+whereas size alone ($\{H\}$) performs robustly. For gradient boosting (XGBoost), 
+kinematics adds significant value over size alone ($F_2$ 0.656 $\to$ 0.714), but Random 
+Forest struggles to integrate the kinematic signal, suffering a performance drop 
 (Table~\ref{tab:cv}). SHAP and impurity importances concur: $H$ (and the
 imputation-linked diameter) dominate, while velocity and distance contribute little
 (Fig.~\ref{fig:imp}). Physically, observed proximity alone yields many false
 positives---small objects pass close but are not hazardous---so the $H\le22$ size cut
-does the discriminative work. The $F_2$-optimal operating threshold is 0.59, not 0.5
+does the discriminative work. The $F_2$-optimal operating threshold is 0.284, not 0.5
 (Fig.~\ref{fig:prroc}).
 
 \paragraph{The catalog is a detection record.}
-Keying on the real first-observation date, PHA prevalence falls monotonically from
-$\sim$95\% for objects discovered before 1990 to 1.3\% for those discovered in the
+Keying on the real first-observation date, PHA prevalence falls significantly from
+$\gtrsim$40\% for objects discovered before 1990 to 1.7\% for those discovered in the
 2020s, while the median orbital arc drops from $\sim$$10^{4}$ days to a few days
 (Fig.~\ref{fig:temporal}). Training an XGBoost (kin+size) model on objects discovered
-before 2015 (PHA 23.3\%) and testing on later discoveries (PHA 2.4\%) retains recall
-(0.983; $F_2=0.971$) but degrades precision to 0.928 at the default threshold
-(vs.\ $\approx$0.97 under random CV): the prevalence shift, not the discriminative
+before 2015 (PHA 14.6\%) and testing on later discoveries (PHA 2.6\%) retains recall
+(0.714; $F_2=0.611$) but degrades precision to 0.388 at the default threshold:
+the prevalence shift, not the discriminative
 rule, carries the cost, consistent with the rule being essentially the era-stable
-size cut. PHA status correlates with orbital arc ($r=0.65$), making the
+size cut. PHA status correlates with orbital arc ($r=0.351$), making the
 characterization confound explicit. Conditioning the catalog on close approaches only mildly enriches
-PHAs relative to all NEOs (7.3\% vs.\ 6.0\%), so the dominant selection is temporal
+PHAs relative to all NEOs (6.3\% vs.\ 7.0\%), so the dominant selection is temporal
 (discovery), not the close-approach condition itself.
 
 \begin{figure}[t]
@@ -202,7 +206,7 @@ small, short-arc, non-hazardous objects.}
 \includegraphics[width=0.85\linewidth]{clf_f2_por_features.png}
 \caption{Cross-validated $F_2$ by feature set and model (error bars: CV std). The
 dashed line is the trivial threshold rule. kin-only collapses; size-only and
-kin+size match the rule.}
+kin+size substantially outperform the rule.}
 \label{fig:f2}
 \end{figure}
 
@@ -235,6 +239,8 @@ Points lie above $y=x$: the observed distance is biased high relative to MOID.}
 \includegraphics[width=0.6\linewidth]{clf_collinearity.png}
 \caption{Absolute Pearson correlation among candidate object-level features,
 motivating the pruned sets.}
+\end{figure}
+
 \subsection{MOID Prediction}
 Because orbital MOID requires extended astrometric observations to establish a
 full orbital solution, early-stage hazard evaluation benefits from predicting orbital

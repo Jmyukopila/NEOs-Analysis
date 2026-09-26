@@ -15,6 +15,7 @@ shap==0.51.0
 
 # Visualization
 matplotlib==3.10.6
+seaborn==0.13.2
 
 # Data acquisition
 requests==2.34.2

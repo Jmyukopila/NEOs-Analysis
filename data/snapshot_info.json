@@ -1,10 +1,11 @@
 {
-  "snapshot_date_utc": "20260811",
-  "dist_max_au": 0.5,
-  "n_events": 340469,
-  "n_events_post_discovery": 74530,
-  "n_objects": 39074,
-  "n_pha_official": 2481,
-  "python": "3.11.9",
-  "pandas": "2.3.3"
+    "snapshot_date_utc": "20260811",
+    "dist_max_au": 0.5,
+    "n_events": 340469,
+    "n_events_post_discovery": 74530,
+    "n_objects": 39074,
+    "n_pha_official": 2481,
+    "python": "3.11.9",
+    "pandas": "2.3.3",
+    "sha256": "f00553bc12481cd27e59c191ca126137f0c5bb1249f383fe9ad1fc80ade1bc83"
 }

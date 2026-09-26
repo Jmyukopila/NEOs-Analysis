@@ -291,7 +291,7 @@ def generar_graficas_cohorte(df_te, total_haz, p_rec, ml_rec, det_ambos, det_sol
 
     plt.xlabel("MOID Orbital Real (au)", fontsize=11)
     plt.ylabel("Densidad de Probabilidad", fontsize=11)
-    plt.title("Racionalidad de los Falsos Positivos de ML (Cohorte ≥ 2015)\n(89.0% se concentran entre 0.05 y 0.08 au)",
+    plt.title(f"Racionalidad de los Falsos Positivos de ML (Cohorte ≥ 2015)\n({fp_sub_008:.1f}% se concentran entre 0.05 y 0.08 au)",
               fontsize=12, fontweight="bold")
     plt.legend(fontsize=10)
     plt.grid(True, linestyle="--", alpha=0.5)

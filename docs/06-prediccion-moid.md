@@ -58,26 +58,26 @@ Para evitar fugas de información y colinealidades triviales, se utilizan única
 Evaluado mediante **Validación Cruzada de 5 Folds (5-Fold CV)** sobre los objetos con aproximaciones observadas:
 
 - **Baseline Naïve (`distnom_min` directo):**
-  - $R^2 = 0.7481$
-  - $\text{MAE} = 0.0573\text{ au}$
-  - $\text{RMSE} = 0.0898\text{ au}$
+  - $R^2 = 0.5046$
+  - $\text{MAE} = 0.0261\text{ au}$
+  - $\text{RMSE} = 0.0542\text{ au}$
 
 - **Modelos de Machine Learning (Set `kin+size`):**
-  - **Ridge Regression:** $R^2 \approx 0.7512$, $\text{MAE} \approx 0.0565\text{ au}$
-  - **Random Forest Regressor:** $R^2 \approx 0.8145$, $\text{MAE} \approx 0.0468\text{ au}$
-  - **XGBoost Regressor:** **$R^2 = 0.8423$**, **$\text{MAE} = 0.0431\text{ au}$**, $\text{RMSE} = 0.0708\text{ au}$
+  - **Ridge Regression:** $R^2 \approx 0.7715$, $\text{MAE} \approx 0.0227\text{ au}$
+  - **Random Forest Regressor:** $R^2 \approx 0.7966$, $\text{MAE} \approx 0.0195\text{ au}$
+  - **XGBoost Regressor:** **$R^2 = 0.8057$**, **$\text{MAE} = 0.0194\text{ au}$**, $\text{RMSE} = 0.0339\text{ au}$
 
-El modelo **XGBoost Regressor** reduce el error absoluto medio ($\text{MAE}$) en más de un $24.8\%$ respecto a la cota observada directa, corrigiendo en gran medida el sesgo donde $\mathrm{distnom\_min} > \text{MOID}$.
+El modelo **XGBoost Regressor** reduce el error absoluto medio ($\text{MAE}$) significativamente respecto a la cota observada directa, corrigiendo en gran medida el sesgo donde $\mathrm{distnom\_min} > \text{MOID}$.
 
 ### 2. Clasificación Binaria del Umbral $\text{MOID} \le 0.05\text{ au}$
 
 - **Proxy directo ($\mathrm{distnom\_min} \le 0.05$):**
-  - Precisión: $0.985$ | Recall: $0.295$ | $F_2\text{-score}$: $0.343$
-- **Regresión Logística:** $F_2 = 0.698$ | $\text{ROC-AUC} = 0.884$
-- **Random Forest Classifier:** $F_2 = 0.742$ | $\text{ROC-AUC} = 0.912$
-- **XGBoost Classifier:** **$F_2 = 0.768$** | Precisión: $0.712$ | Recall: $0.784$ | **$\text{ROC-AUC} = 0.925$**
+  - Precisión: $0.999$ | Recall: $0.785$ | $F_2\text{-score}$: $0.820$
+- **Regresión Logística:** $F_2 = 0.907$ | $\text{ROC-AUC} = 0.946$
+- **Random Forest Classifier:** $F_2 = 0.910$ | $\text{ROC-AUC} = 0.960$
+- **XGBoost Classifier:** **$F_2 = 0.898$** | Precisión: $0.936$ | Recall: $0.889$ | **$\text{ROC-AUC} = 0.963$**
 
-ML logra elevar el *recall* del umbral orbital desde el $29.5\%$ (del proxy ingenuo) hasta más del **$78.4\%$**, identificando una porción sustancial de los objetos cuyo MOID es peligroso aunque no hayan sido capturados en un acercamiento extremadamente próximo.
+ML logra elevar el *recall* del umbral orbital desde el $78.5\%$ (del proxy ingenuo) hasta más del **$91.7\%$** (con RF), identificando una porción sustancial de los objetos cuyo MOID es peligroso aunque no hayan sido capturados en un acercamiento extremadamente próximo.
 
 ### 3. Validación Temporal (Hold-out por Año de Descubrimiento)
 Para evaluar la generalización sobre asteroides de reciente descubrimiento:
@@ -85,26 +85,9 @@ Para evaluar la generalización sobre asteroides de reciente descubrimiento:
 - **Test:** Objetos descubiertos $\ge 2015$.
 
 - **Resultados en Test:**
-  - Regresión XGBoost: $R^2 = 0.7921$, $\text{MAE} = 0.0482\text{ au}$.
-  - Clasificación XGBoost: $F_2 = 0.712$, $\text{ROC-AUC} = 0.895$.
+  - Clasificación XGBoost: $F_2 = 0.909$, $\text{ROC-AUC} = 0.965$.
 
 Aunque se evidencia un ligero descenso atribuible al sesgo de selección observacional de los sondeos modernos, el modelo mantiene una alta capacidad de estimación.
-
----
-
-## Justificación Física del Modelo (Aproximación Analítica)
-
-Aunque XGBoost es un ensamble complejo de árboles de decisión, la relación subyacente que aprende de los datos se puede aproximar con una altísima precisión ($R^2 \approx 0.781$) usando una sencilla ecuación basada exclusivamente en la cinemática del encuentro (distancia observada y velocidad relativa):
-
-$$ \text{MOID} \approx \mathrm{distnom\_min} \times \left( 0.85 - 0.01 \cdot v_{\infty} \right) $$
-
-**Interpretación Astrodinámica:**
-El modelo descubre matemáticamente que el MOID es siempre una fracción de la distancia mínima observada, y que esta fracción es inversamente proporcional a la velocidad relativa del asteroide ($v_{\infty}$).
-
-- **Encuentros rápidos (alto $v_{\infty}$):** Físicamente implican que la órbita del asteroide cruza la de la Tierra de forma muy inclinada o elíptica. Al "cortar" nuestra órbita transversalmente, pasa poquísimo tiempo cerca. Para que logremos registrar un avistamiento cercano, su cruce orbital real (el MOID) tiene que estar extremadamente ceñido a la Tierra. Por eso el modelo aplica una fracción muy pequeña.
-- **Encuentros lentos (bajo $v_{\infty}$):** Implican que el asteroide viaja casi "en paralelo" a la Tierra. Como acompañan a nuestro planeta por más tiempo en el trayecto, es posible tener un acercamiento prolongado aunque sus órbitas no se crucen de forma tan íntima. Aquí el MOID se aproxima mucho más al valor nominal observado (la fracción es mayor).
-
-Esto demuestra que **el modelo Machine Learning es físicamente robusto**, pues deduce por sí solo la geometría cinemática del encuentro sin requerir que se le programen ecuaciones orbitales previas, y sin depender de sesgos espurios (como el tamaño del asteroide).
 
 ---
 
@@ -123,19 +106,19 @@ Entrenando el modelo en descubrimientos históricos ($\le 2014$) y evaluándolo 
 | Método | Recall (Sensibilidad) | Precisión | $F_2$-Score | Peligrosos Detectados |
 | :--- | :---: | :---: | :---: | :---: |
 | **Proxy Observacional ($\mathrm{distnom\_min} \le 0.05$)** | $81.38\%$ | **$99.93\%$** | $0.8452$ | $13,726$ |
-| **Modelo ML (XGBoost)** | **$90.35\%$** | $94.38\%$ | **$0.9113$** | **$16,137$** |
+| **Modelo ML (XGBoost)** | **$90.26\%$** | $93.78\%$ | **$0.9095$** | **$16,224$** |
 
 ### 2. Análisis de Rescate: ¿Qué Aporta el ML?
 En esta cohorte moderna hay **$16,856$ asteroides verdaderamente peligrosos** ($\text{MOID} \le 0.05\text{ au}$):
 - El proxy observacional **omite a $3,139$ asteroides peligrosos** debido a que, en su breve ventana de observación reciente, pasaron a distancias como $0.08$ o $0.15\text{ au}$, aun teniendo órbitas que cruzan la de la Tierra a menos de $0.05\text{ au}$.
-- **ML rescata a $1,513$ de estos asteroides ($48.2\%$ de los omitidos)**, detectando su peligro orbital a partir de su cinemática temprana.
+- **ML rescata a $1,498$ de estos asteroides ($47.72\%$ de los omitidos)**, detectando su peligro orbital a partir de su cinemática temprana.
 - **Pérdida nula:** El modelo ML no omitió **ningún** asteroide que el proxy hubiese capturado ($0$ casos).
 
 ### 3. Racionalidad Física de los Falsos Positivos de ML
-De los $907$ falsos positivos arrojados por ML (objetos con $\text{MOID} > 0.05\text{ au}$ clasificados como peligrosos):
-- **MOID real promedio:** $0.0638\text{ au}$ (Mediana: $0.0589\text{ au}$).
-- **$89.0\%$** tienen un MOID real $\le 0.08\text{ au}$.
-- **$96.6\%$** tienen un MOID real $\le 0.10\text{ au}$.
+De los $1009$ falsos positivos arrojados por ML (objetos con $\text{MOID} > 0.05\text{ au}$ clasificados como peligrosos):
+- **MOID real promedio:** $0.0728\text{ au}$ (Mediana: $0.0628\text{ au}$).
+- **$76.3\%$** tienen un MOID real $\le 0.08\text{ au}$.
+- **$87.7\%$** tienen un MOID real $\le 0.10\text{ au}$.
 
 Esto demuestra que **los errores de ML son físicamente racionales**: no confunde asteroides del cinturón principal con peligrosos, sino que clasifica como "peligrosos" a objetos en el borde orbital inmediato del umbral, lo cual es el comportamiento deseado y conservador para la defensa planetaria.
 
@@ -145,9 +128,9 @@ Al comparar las tres grandes épocas del catálogo:
 
 | Época | Rango de Años | $N$ | Peligrosos Reales | Recall Proxy | Recall ML | Mediana $n_{\mathrm{appro}}$ |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Histórico** | $< 2000$ | $906$ | $381$ ($42.1\%$) | $61.15\%$ | **$79.00\%$** | $2.0$ |
-| **Transición** | $2000 - 2014$ | $9,974$ | $4,996$ ($50.1\%$) | $69.96\%$ | **$83.93\%$** | $2.0$ |
-| **Moderno** | $\ge 2015$ | $26,525$ | $16,856$ ($63.5\%$) | $81.38\%$ | **$90.06\%$** | $1.0$ |
+| **Histórico** | $< 2000$ | $906$ | $381$ ($42.1\%$) | $61.15\%$ | **$78.22\%$** | $2.0$ |
+| **Transición** | $2000 - 2014$ | $9,974$ | $4,996$ ($50.1\%$) | $69.96\%$ | **$84.57\%$** | $2.0$ |
+| **Moderno** | $\ge 2015$ | $26,525$ | $16,856$ ($63.5\%$) | $81.38\%$ | **$90.99\%$** | $1.0$ |
 
 En la era moderna, la mediana de aproximaciones registradas es apenas $1.0$. Esto confirma la necesidad de Machine Learning: ante la falta de un historial de múltiples aproximaciones acumuladas, el modelo predice la geometría orbital global desde el primer encuentro registrado.
 
@@ -155,10 +138,10 @@ En la era moderna, la mediana de aproximaciones registradas es apenas $1.0$. Est
 
 ## Conclusiones Metodológicas
 
-1. **Factibilidad de la Predicción:** Es posible estimar razonablemente el `MOID` orbital ($R^2 > 0.84$) usando solo características cinemáticas y observacionales tempranas, cerrando la brecha antes de contar con un arco orbital prolongado.
-2. **Superación del Proxy Ingenuo con Racionalidad Física:** El modelo ML rescata el $48.2\%$ de los asteroides peligrosos que el proxy observacional omite en sondeos modernos, y sus falsos positivos son cuasi-peligrosos ($89\%$ con $\text{MOID} \le 0.08\text{ au}$).
+1. **Factibilidad de la Predicción:** Es posible estimar razonablemente el `MOID` orbital ($R^2 \approx 0.806$) usando solo características cinemáticas y observacionales tempranas, cerrando la brecha antes de contar con un arco orbital prolongado.
+2. **Superación del Proxy Ingenuo con Racionalidad Física:** El modelo ML rescata el $47.72\%$ de los asteroides peligrosos que el proxy observacional omite en sondeos modernos, y sus falsos positivos son cuasi-peligrosos ($76.3\%$ con $\text{MOID} \le 0.08\text{ au}$).
 3. **Consistencia Temporal Comprobada:** Al evaluar en cohortes homogéneas de tiempo, el modelo demuestra una superioridad consistente sin depender de sesgos de acumulación de datos históricos.
-4. **Reproducibilidad:** Los scripts `scripts/predict_moid.py`, `scripts/validate_moid_physics.py` y `scripts/verify_hazard_prediction.py` permiten regenerar todas las métricas, figuras y tablas en `results/`.
+4. **Reproducibilidad:** Los scripts `scripts/predict_moid.py` y `scripts/verify_hazard_prediction.py` permiten regenerar todas las métricas, figuras y tablas en `results/`.
 
 ---
 

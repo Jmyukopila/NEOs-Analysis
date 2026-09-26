@@ -78,7 +78,7 @@ En este dataset hay dos fuentes claras de redundancia:
 - `Diameter(km)` fue **imputado desde** `H(mag)` → dependencia funcional exacta en esas filas.
 - `v_rel`, `v_inf` y sus agregados son casi idénticos en pasos lejanos.
 
-La **poda** resultante conserva una sola distancia (`distmin_min`), una sola velocidad
+La **poda** resultante conserva una sola distancia (`distnom_min`), una sola velocidad
 (`vrel_max`) y un solo indicador de tamaño (`H_obs`).
 
 ---
@@ -168,7 +168,7 @@ definición, no descubriendo física.
 
 El notebook lo contrasta con un **baseline de regla de dos umbrales** — aplicar los mismos
 umbrales que definen PHA sobre las variables observadas. En este proyecto esa regla
-alcanza **F2 = 0.343**, muy por debajo de XGBoost sobre `kin+size` (**F2 = 0.713**): la
+alcanza **F2 = 0.343**, muy por debajo de XGBoost sobre `kin+size` (**F2 = 0.712**): la
 brecha entre la regla ingenua y el modelo entrenado es justo la evidencia de que **aquí**
 no hay circularidad — hay señal real que el ML captura y la regla no. (Una versión
 anterior y censurada del dataset sí igualaba regla y modelo en F2 ≈ 0.98; ver
