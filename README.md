@@ -41,12 +41,14 @@ notebook? Todo está explicado en **[`docs/`](docs/README.md)**:
 
 ## Estructura del pipeline
 
-El análisis está en dos notebooks que se ejecutan **en orden**:
+El análisis está dividido en notebooks exploratorios y scripts de ejecución directa:
 
 1. **`data/ProyectoNeoRework_data.ipynb`** — descarga las aproximaciones cercanas (CAD
    API, troceada por décadas con reintentos) y el catálogo de NEOs (SBDB API), construye
    las etiquetas y guarda `data/close_approaches.csv` (cache de 30 días).
-2. **`notebooks/ProyectoNeoRework_ml.ipynb`** — lee el CSV y ejecuta el análisis.
+2. **`notebooks/ProyectoNeoRework_ml.ipynb`** — ejecuta el análisis exploratorio (PCA, K-Means) y clasificaciones base.
+3. **`notebooks/regresion_moid_y_prueba_historica.ipynb`** — ejecuta el análisis profundo de regresión, restricciones físicas y la simulación histórica pre-2000.
+4. **`scripts/`** — scripts de validación y predicción como `predict_moid.py` (regresión unificada con restricciones físicas) y `verify_hazard_prediction.py` (verificación de peligrosidad temporal).
 
 ## Características principales
 

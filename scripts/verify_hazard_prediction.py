@@ -112,11 +112,12 @@ def analizar_cohorte_moderna(obj):
 
     scale_pos = (len(y_tr) - y_tr.sum()) / y_tr.sum()
     model = xgb.XGBClassifier(
-        n_estimators=50,
+        n_estimators=300,
         scale_pos_weight=scale_pos,
         learning_rate=0.1,
         max_depth=5,
         random_state=SEED,
+        eval_metric="logloss",
         n_jobs=-1
     )
     model.fit(X_tr, y_tr)
@@ -323,11 +324,12 @@ def analizar_evolucion_por_epocas(obj):
 
     scale_pos = (len(y) - y.sum()) / y.sum()
     model = xgb.XGBClassifier(
-        n_estimators=50,
+        n_estimators=300,
         scale_pos_weight=scale_pos,
         learning_rate=0.1,
         max_depth=5,
         random_state=SEED,
+        eval_metric="logloss",
         n_jobs=-1
     )
 
