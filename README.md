@@ -142,3 +142,21 @@ pip install -r requirements.txt
 | `shap` | Explicabilidad del modelo |
 | `matplotlib` | Visualización |
 | `requests` | Consumo de las APIs de JPL |
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest                      # bateria completa
+pytest --cov                # con informe de cobertura (config en .coveragerc)
+```
+
+Los tests son unitarios y **no tocan la red ni el dataset real**: construyen catálogos
+sintéticos mínimos en `tmp_path` y sustituyen `requests.get` por un doble. Cubren:
+
+- `scripts/verificar_discrepancias.py` — cada bloque A–I con un catálogo «sano» (todas las
+  comprobaciones corregibles pasan) y con catálogos censurados que el script debe detectar.
+- Las funciones auxiliares de `data/ProyectoNeoRework_data.ipynb` (`limpiar_fecha`,
+  `archivo_es_reciente`, `_sbdb_cache_ok`, `descargar_cad`), extraídas del notebook con
+  `ast` para poder ejecutarlas sin lanzar el pipeline de descarga
+  (ver `tests/conftest.py`).

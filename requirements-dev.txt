@@ -1,0 +1,6 @@
+# Dependencias solo de desarrollo (bateria de tests). El analisis en si solo
+# necesita requirements.txt.
+-r requirements.txt
+
+pytest==9.1.1
+pytest-cov==7.1.0

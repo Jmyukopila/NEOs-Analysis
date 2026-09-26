@@ -8,6 +8,12 @@
 # Jupyter checkpoints
 .ipynb_checkpoints/
 
+# Tests / cobertura
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
 # Python
 __pycache__/
 *.py[cod]
